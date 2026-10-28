@@ -18,6 +18,10 @@
 
 # keystore files
 *.jks
+!app/keys/sakura.jks
+!app/keys/community.jks
+!app/keys/9esim.jks
+!app/keys/omnt_default.jks
 
 # Generated files
 bin/

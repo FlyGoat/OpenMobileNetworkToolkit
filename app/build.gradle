@@ -19,7 +19,7 @@ if (keystorePropertiesFile.exists()) {
     project.logger.warn("Using default values for signing config.")
     keystoreProperties['keyAlias'] = "omnt_default"
     keystoreProperties['keyPassword'] = "omnt2024"
-    keystoreProperties['storeFile'] = file("omnt_default.jks")
+    keystoreProperties['storeFile'] = file("keys/omnt_default.jks")
     keystoreProperties['storePassword'] = "omnt2024"
 }
 

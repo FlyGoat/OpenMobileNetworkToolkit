@@ -1,5 +1,8 @@
 # Signing the app
-This can be done with android studio.  
+
+Builds use a default key and some well-known signing keys.
+
+For signing with your own key, use Android Studio.
 
 To generated a signed apk:
 

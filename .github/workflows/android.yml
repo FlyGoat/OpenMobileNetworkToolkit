@@ -1,6 +1,7 @@
 name: Android CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [ 'main', 'rel/**' ]
     tags:
@@ -13,6 +14,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     environment: ngni-omnt
+    env:
+      OMNT_STORE_PASSWORD: ${{ secrets.STOREPASSWORD }}
+      OMNT_KEY_ALIAS: ${{ secrets.KEYALIAS }}
+      OMNT_KEY_PASSWORD: ${{ secrets.KEYPASSWORD }}
     steps:
       - name: Checkout Branch ${{ github.ref }}
         uses: actions/checkout@v4
@@ -22,20 +27,13 @@ jobs:
           unzip jniLibs.zip -d app/src/main
           rm jniLibs.zip
 
-      - name: Decode Keystore and Create key.properties
+      - name: Restore existing OMNT signing key
         env:
           ENCODED_STRING: ${{ secrets.KEYSTORE }}
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.STOREPASSWORD }}
-          RELEASE_KEYSTORE_ALIAS: ${{ secrets.KEYALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.KEYPASSWORD }}
         run: |
-          echo -n "$ENCODED_STRING" | base64 -d > app/OpenMobileNetworkToolkit-key.jks
-          mkdir android
-          touch android/key.properties
-          echo "storePassword=$RELEASE_KEYSTORE_PASSWORD" > android/key.properties
-          echo "keyPassword=$RELEASE_KEY_PASSWORD" >> android/key.properties
-          echo "keyAlias=$RELEASE_KEYSTORE_ALIAS" >> android/key.properties
-          echo "storeFile=OpenMobileNetworkToolkit-key.jks" >> android/key.properties
+          if [[ -n "$ENCODED_STRING" ]]; then
+            echo -n "$ENCODED_STRING" | base64 -d > app/keys/OpenMobileNetworkToolkit-key.jks
+          fi
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -45,28 +43,20 @@ jobs:
           cache: gradle
 
       - name: Build Release APK
-        env:
-          ENCODED_STRING: ${{ secrets.KEYSTORE }}
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PW }}
-          RELEASE_KEYSTORE_ALIAS: ${{ secrets.KEYSTORE_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PW }}
         run: ./gradlew assembleRelease --stacktrace
 
       - name: Build Debug APK
-        env:
-          ENCODED_STRING: ${{ secrets.KEYSTORE }}
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PW }}
-          RELEASE_KEYSTORE_ALIAS: ${{ secrets.KEYSTORE_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PW }}
         run: ./gradlew assembleDebug --stacktrace
 
       - name: Generate SPDX
-        env:
-          ENCODED_STRING: ${{ secrets.KEYSTORE }}
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PW }}
-          RELEASE_KEYSTORE_ALIAS: ${{ secrets.KEYSTORE_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PW }}
         run: ./gradlew app:spdxSbomForRelease
+
+      - name: Sign APKs with public eSIM keys and optional OMNT key
+        run: |
+          apksigner=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
+          bash .github/scripts/sign-apks.sh "$apksigner" \
+            app/build/outputs/apk/debug/app-debug.apk \
+            app/build/outputs/apk/release/app-release.apk
 
       - name: Get release file apk path
         id: releaseApk
